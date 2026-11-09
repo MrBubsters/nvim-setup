@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neovim Project Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: an editor window. A sticky "file tree" of sections on the left, the guide in the editor pane on the right. Palette borrowed from the tokyonight colorscheme the setup uses. */
+:root {
+  --bg: #f4f5fa;
+  --pane: #ffffff;
+  --fg: #2a2e45;
+  --muted: #646a86;
+  --line: #dde0ec;
+  --accent: #2e66d6;
+  --accent-soft: #e4ecfc;
+  --green: #3f7f2a;
+  --magenta: #8a3fc9;
+  --key-bg: #ffffff;
+  --key-edge: #b9bed3;
+  --code-bg: #eceef6;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16161e; --pane: #1a1b26; --fg: #c8d0f0; --muted: #8a92b8; --line: #2c2f45;
+    --accent: #7aa2f7; --accent-soft: #232c4a; --green: #9ece6a; --magenta: #bb9af7;
+    --key-bg: #24283b; --key-edge: #3d4466; --code-bg: #20222f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16161e; --pane: #1a1b26; --fg: #c8d0f0; --muted: #8a92b8; --line: #2c2f45;
+  --accent: #7aa2f7; --accent-soft: #232c4a; --green: #9ece6a; --magenta: #bb9af7;
+  --key-bg: #24283b; --key-edge: #3d4466; --code-bg: #20222f; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15.5px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 80px; }
+header { display: grid; gap: 14px; margin-bottom: 32px; max-width: 760px; }
+.path { font: 13px var(--mono); color: var(--muted); }
+.path b { color: var(--green); font-weight: 400; }
+h1 { font: 800 clamp(2rem, 5vw, 3.1rem)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 64ch; }
+
+.leader {
+  display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center;
+  background: var(--accent-soft); border-radius: 10px; padding: 16px 20px; margin-top: 6px;
+}
+.leader .big kbd { font-size: 1.15rem; padding: 8px 22px; }
+.leader p { color: var(--fg); margin: 0; }
+
+.layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
+nav.tree {
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px);
+  font: 13px/1.9 var(--mono); border-right: 1px solid var(--line); padding-right: 12px;
+}
+nav.tree .root { color: var(--muted); }
+nav.tree a { display: block; color: var(--fg); text-decoration: none; padding-left: 14px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+nav.tree a::before { content: "├ "; color: var(--line); }
+nav.tree a:last-child::before { content: "└ "; }
+nav.tree a:hover, nav.tree a:focus-visible { color: var(--accent); outline: none; background: var(--accent-soft); }
+
+.filter { position: relative; margin-bottom: 26px; }
+.filter label { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font: 600 14px var(--mono); color: var(--accent); pointer-events: none; }
+.filter input {
+  width: 100%; font: 15px var(--body); color: var(--fg); background: var(--pane);
+  border: 1px solid var(--line); border-radius: 8px; padding: 11px 14px 11px 34px;
+}
+.filter input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.empty { color: var(--muted); font-style: italic; }
+
+main { display: grid; gap: 44px; min-width: 0; }
+section { display: grid; gap: 12px; scroll-margin-top: 20px; min-width: 0; }
+h2 { font: 600 1.55rem/1.2 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h3 { font: 600 0.78rem var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 10px 0 0; }
+section > p { margin: 0; max-width: 68ch; }
+
+.keys { background: var(--pane); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: 9px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+tr:first-child td { border-top: 0; }
+td:first-child { width: 52%; }
+td:last-child { white-space: nowrap; }
+td small { display: block; color: var(--muted); font-size: 0.84rem; line-height: 1.4; margin-top: 2px; white-space: normal; }
+
+kbd {
+  display: inline-block; font: 600 12.5px/1 var(--mono); color: var(--fg);
+  background: var(--key-bg); border: 1px solid var(--key-edge); border-bottom-width: 3px;
+  border-radius: 6px; padding: 5px 7px 4px; min-width: 1.9em; text-align: center; margin: 1px 1px;
+}
+kbd.sp { color: var(--accent); }
+.then { color: var(--muted); font-size: 12px; margin: 0 3px; }
+code { font: 13px var(--mono); background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+pre { font: 13px/1.6 var(--mono); background: var(--code-bg); padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 0; }
+pre .c { color: var(--muted); }
+
+ol.flow { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 8px; }
+ol.flow li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+ol.flow li::before { content: counter(s); font: 600 13px var(--mono); color: var(--magenta); text-align: right; }
+
+.note { border-left: 3px solid var(--magenta); padding: 4px 0 4px 14px; color: var(--fg); max-width: 68ch; margin: 0; }
+.note strong { color: var(--magenta); }
+
+.modes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.95rem; }
+.mode { font: 600 12px var(--mono); padding: 4px 10px; border-radius: 4px; color: var(--pane); }
+.mode.n { background: var(--accent); } .mode.i { background: var(--green); } .mode.v { background: var(--magenta); }
+
+@media (max-width: 820px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  nav.tree { position: static; border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; columns: 2; column-gap: 16px; }
+  nav.tree .root { column-span: all; }
+  .leader { grid-template-columns: 1fr; }
+  td { display: block; width: auto !important; border-top: 0; padding: 4px 14px; }
+  td:first-child { padding-top: 10px; border-top: 1px solid var(--line); }
+  td:last-child { padding-bottom: 10px; white-space: normal; }
+  tr:first-child td:first-child { border-top: 0; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="path"><b>~/.config/nvim</b> · Neovim 0.12 + LazyVim · tokyonight</div>
+    <h1>Neovim Project Playbook</h1>
+    <p>The things you'll actually do inside a project, from opening it to committing your work, and the keys for each. Every shortcut here was checked against the setup installed on your machine.</p>
+    <div class="leader">
+      <div class="big"><kbd class="sp">Space</kbd></div>
+      <p><strong>The one rule:</strong> press <kbd class="sp">Space</kbd> and wait. A menu lists every command group. Below, <kbd class="sp">Space</kbd><span class="then">→</span><kbd>g</kbd><span class="then">→</span><kbd>g</kbd> means press those keys one after another, not together.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="tree" aria-label="Sections">
+      <div class="root">playbook/</div>
+      <a href="#open">open-a-project</a>
+      <a href="#modes">modes-and-editing</a>
+      <a href="#move">move-between-files</a>
+      <a href="#tree">the-file-tree</a>
+      <a href="#search">search</a>
+      <a href="#code">understand-code</a>
+      <a href="#git">git-in-the-editor</a>
+      <a href="#lazygit">commit-with-lazygit</a>
+      <a href="#windows">windows-and-terminal</a>
+      <a href="#test">tests-and-debugging</a>
+      <a href="#claude">working-with-claude</a>
+      <a href="#stuck">when-stuck</a>
+    </nav>
+
+    <main>
+      <div class="filter">
+        <label for="q">/</label>
+        <input id="q" type="search" placeholder="Filter shortcuts, e.g. rename, commit, split" autocomplete="off">
+      </div>
+      <p class="empty" id="none" hidden>No shortcuts match that. Try a shorter word, or press <kbd class="sp">Space</kbd><kbd>s</kbd><kbd>k</kbd> in nvim to search every keymap.</p>
+
+      <section id="open">
+        <h2>Open a project</h2>
+        <p>Start nvim from a terminal, the same way you'd use <code>code .</code>. Opening a folder switches nvim into it, so search and git cover the whole project.</p>
+        <pre><span class="c"># file tree on the left, editor on the right</span>
+cd ~/Documents/little-buddy && nvim .
+<span class="c"># or from anywhere</span>
+nvim ~/Documents/little-buddy</pre>
+        <div class="keys"><table>
+          <tr><td>Reopen the files you had open last time in this folder</td><td><kbd class="sp">Space</kbd><kbd>q</kbd><kbd>s</kbd></td></tr>
+          <tr><td>Save the current file</td><td><kbd>Ctrl</kbd><kbd>s</kbd> <span class="then">or</span> <code>:w</code></td></tr>
+          <tr><td>Quit everything<small>Warns you if anything is unsaved.</small></td><td><kbd class="sp">Space</kbd><kbd>q</kbd><kbd>q</kbd> <span class="then">or</span> <code>:qa</code></td></tr>
+        </table></div>
+      </section>
+
+      <section id="modes">
+        <h2>Modes and everyday editing</h2>
+        <div class="modes">
+          <span class="mode n">NORMAL</span> keys are commands
+          <span class="mode i">INSERT</span> keys type text
+          <span class="mode v">VISUAL</span> keys act on a selection
+        </div>
+        <p>The mode is shown at the bottom left. <kbd>Esc</kbd> always takes you back to Normal.</p>
+        <div class="keys"><table>
+          <tr><td>Start typing before / after the cursor</td><td><kbd>i</kbd> <span class="then">/</span> <kbd>a</kbd></td></tr>
+          <tr><td>Start a new line below / above</td><td><kbd>o</kbd> <span class="then">/</span> <kbd>O</kbd></td></tr>
+          <tr><td>Back to Normal mode</td><td><kbd>Esc</kbd></td></tr>
+          <tr><td>Move by character</td><td><kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> <span class="then">or arrows</span></td></tr>
+          <tr><td>Next word / previous word</td><td><kbd>w</kbd> <span class="then">/</span> <kbd>b</kbd></td></tr>
+          <tr><td>Jump to the next / previous space-separated word<small>Works while typing too. <kbd>Alt</kbd> (Option on a Mac) does the same.</small></td><td><kbd>Ctrl</kbd><kbd>→</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>←</kbd></td></tr>
+          <tr><td>Top / bottom of file</td><td><kbd>g</kbd><kbd>g</kbd> <span class="then">/</span> <kbd>G</kbd></td></tr>
+          <tr><td>Jump anywhere on screen<small>Press <kbd>s</kbd>, type two letters of where you want to go, then the label that appears.</small></td><td><kbd>s</kbd></td></tr>
+          <tr><td>Select characters / whole lines</td><td><kbd>v</kbd> <span class="then">/</span> <kbd>V</kbd></td></tr>
+          <tr><td>Delete (cut) line / copy line / paste</td><td><kbd>d</kbd><kbd>d</kbd> <kbd>y</kbd><kbd>y</kbd> <kbd>p</kbd></td></tr>
+          <tr><td>Undo / redo</td><td><kbd>u</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Comment or uncomment a line<small>Works on a selection too: <kbd>V</kbd>, move, then <kbd>g</kbd><kbd>c</kbd>.</small></td><td><kbd>g</kbd><kbd>c</kbd><kbd>c</kbd></td></tr>
+          <tr><td>Search within this file, then next match</td><td><kbd>/</kbd><code>text</code> <kbd>n</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="move">
+        <h2>Move between files</h2>
+        <div class="keys"><table>
+          <tr><td>Open a file by name<small>Fuzzy search: <code>srvpy</code> finds <code>server.py</code>.</small></td><td><kbd class="sp">Space</kbd><kbd class="sp">Space</kbd></td></tr>
+          <tr><td>Recently opened files</td><td><kbd class="sp">Space</kbd><kbd>f</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Previous / next open file (tabs at the top)</td><td><kbd>Shift</kbd><kbd>h</kbd> <span class="then">/</span> <kbd>Shift</kbd><kbd>l</kbd></td></tr>
+          <tr><td>Pick from open files</td><td><kbd class="sp">Space</kbd><kbd>,</kbd></td></tr>
+          <tr><td>Flip to the file you were just in</td><td><kbd class="sp">Space</kbd><kbd>`</kbd></td></tr>
+          <tr><td>Jump back / forward in your history<small>Use after <kbd>g</kbd><kbd>d</kbd> takes you into another file.</small></td><td><kbd>Ctrl</kbd><kbd>o</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>i</kbd></td></tr>
+          <tr><td>Close this file / close all other files</td><td><kbd class="sp">Space</kbd><kbd>b</kbd><kbd>d</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>b</kbd><kbd>o</kbd></td></tr>
+          <tr><td>New untitled file</td><td><kbd class="sp">Space</kbd><kbd>f</kbd><kbd>n</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="tree">
+        <h2>The file tree</h2>
+        <p>Toggle it with <kbd class="sp">Space</kbd><kbd>e</kbd>. These keys work while the cursor is inside it.</p>
+        <div class="keys"><table>
+          <tr><td>Open a file / expand a folder</td><td><kbd>Enter</kbd> <span class="then">or</span> <kbd>l</kbd></td></tr>
+          <tr><td>Collapse folder / collapse everything</td><td><kbd>h</kbd> <span class="then">/</span> <kbd>Z</kbd></td></tr>
+          <tr><td>Open the file in a side-by-side split</td><td><kbd>Ctrl</kbd><kbd>v</kbd></td></tr>
+          <tr><td>New file<small>End the name with <code>/</code> to make a folder.</small></td><td><kbd>a</kbd></td></tr>
+          <tr><td>Rename / move / copy</td><td><kbd>r</kbd> <kbd>m</kbd> <kbd>c</kbd></td></tr>
+          <tr><td>Delete (goes to the system trash)</td><td><kbd>d</kbd></td></tr>
+          <tr><td>Toggle hidden files / git-ignored files<small>Both are shown by default, so <code>.env</code> and friends appear.</small></td><td><kbd>H</kbd> <span class="then">/</span> <kbd>I</kbd></td></tr>
+          <tr><td>Next / previous file with git changes</td><td><kbd>]</kbd><kbd>g</kbd> <span class="then">/</span> <kbd>[</kbd><kbd>g</kbd></td></tr>
+          <tr><td>Next file with an error</td><td><kbd>]</kbd><kbd>e</kbd></td></tr>
+          <tr><td>Jump from tree to editor / back to tree</td><td><kbd>Ctrl</kbd><kbd>l</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>h</kbd></td></tr>
+          <tr><td>List every key the tree understands</td><td><kbd>?</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="search">
+        <h2>Search the project</h2>
+        <div class="keys"><table>
+          <tr><td>Find text in every file</td><td><kbd class="sp">Space</kbd><kbd>/</kbd></td></tr>
+          <tr><td>Find the word under the cursor everywhere</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>w</kbd></td></tr>
+          <tr><td>Functions and classes in this file</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>s</kbd></td></tr>
+          <tr><td>Functions and classes in the whole project</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>S</kbd></td></tr>
+          <tr><td>Reopen your last search where you left it</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>R</kbd></td></tr>
+          <tr><td>Search and replace across files</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>r</kbd></td></tr>
+        </table></div>
+        <h3>Inside any search popup</h3>
+        <div class="keys"><table>
+          <tr><td>Move through results</td><td><kbd>Ctrl</kbd><kbd>j</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>k</kbd> <span class="then">or arrows</span></td></tr>
+          <tr><td>Open result / open in a split</td><td><kbd>Enter</kbd> <span class="then">/</span> <kbd>Ctrl</kbd><kbd>v</kbd></td></tr>
+          <tr><td>Close the popup</td><td><kbd>Esc</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="code">
+        <h2>Understand and change code</h2>
+        <p>Language support is installed for Python, JavaScript/TypeScript, HTML/CSS, SQL, C/C++, shell, JSON, YAML, TOML, Markdown and Docker.</p>
+        <div class="keys"><table>
+          <tr><td>Go to where it's defined</td><td><kbd>g</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Everywhere it's used</td><td><kbd>g</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Show docs and type for the thing under the cursor</td><td><kbd>K</kbd></td></tr>
+          <tr><td>Rename a variable or function everywhere</td><td><kbd class="sp">Space</kbd><kbd>c</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Quick fixes and auto-imports</td><td><kbd class="sp">Space</kbd><kbd>c</kbd><kbd>a</kbd></td></tr>
+          <tr><td>Format the file<small>Also happens on save. Toggle that with <kbd class="sp">Space</kbd><kbd>u</kbd><kbd>f</kbd>.</small></td><td><kbd class="sp">Space</kbd><kbd>c</kbd><kbd>f</kbd></td></tr>
+          <tr><td>Next / previous error or warning</td><td><kbd>]</kbd><kbd>d</kbd> <span class="then">/</span> <kbd>[</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Show the full error message on this line</td><td><kbd class="sp">Space</kbd><kbd>c</kbd><kbd>d</kbd></td></tr>
+          <tr><td>List all problems in the project</td><td><kbd class="sp">Space</kbd><kbd>x</kbd><kbd>x</kbd></td></tr>
+          <tr><td>Accept a completion suggestion</td><td><kbd>Enter</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="git">
+        <h2>Git in the editor</h2>
+        <p>Colored bars in the left margin mark lines you've added, changed or deleted since the last commit. Each block of changes is a <em>hunk</em>.</p>
+        <div class="keys"><table>
+          <tr><td>Next / previous change in this file</td><td><kbd>]</kbd><kbd>h</kbd> <span class="then">/</span> <kbd>[</kbd><kbd>h</kbd></td></tr>
+          <tr><td>Preview what this change replaced</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>p</kbd></td></tr>
+          <tr><td>Undo this change (back to last commit)</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Stage this change / stage the whole file</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>s</kbd> <span class="then">/</span> <kbd>S</kbd></td></tr>
+          <tr><td>Who last changed this line, and why</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>b</kbd></td></tr>
+          <tr><td>Blame for the whole file</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>B</kbd></td></tr>
+          <tr><td>Side-by-side diff of this file</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Changed files<small>In the list, <kbd>Tab</kbd> stages or unstages a file.</small></td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>s</kbd></td></tr>
+          <tr><td>Browse every change in the project</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Commit history / history of this file</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>l</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>g</kbd><kbd>f</kbd></td></tr>
+          <tr><td>Open this file on GitHub</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>B</kbd></td></tr>
+          <tr><td>Open pull requests / issues<small>Uses the <code>gh</code> CLI.</small></td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>p</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>g</kbd><kbd>i</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="lazygit">
+        <h2>Commit and push with lazygit</h2>
+        <p><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>g</kbd> opens lazygit full screen. It has numbered panels: <code>1</code> status, <code>2</code> files, <code>3</code> branches, <code>4</code> commits, <code>5</code> stash. A typical commit:</p>
+        <ol class="flow">
+          <li><span>Press <kbd class="sp">Space</kbd><kbd>g</kbd><kbd>g</kbd>. You land in the files panel, and the right side shows the diff of the selected file.</span></li>
+          <li><span>Move with <kbd>j</kbd>/<kbd>k</kbd>. Press <kbd>Space</kbd> to stage a file, or <kbd>a</kbd> to stage everything.</span></li>
+          <li><span>To stage only some lines, press <kbd>Enter</kbd> on the file, then <kbd>Space</kbd> on each line you want. <kbd>Esc</kbd> goes back.</span></li>
+          <li><span>Press <kbd>c</kbd>, type the commit message, and press <kbd>Enter</kbd>.</span></li>
+          <li><span>Press <kbd>P</kbd> (capital) to push. Press <kbd>q</kbd> to close lazygit.</span></li>
+        </ol>
+        <div class="keys"><table>
+          <tr><td>Pull the latest changes</td><td><kbd>p</kbd></td></tr>
+          <tr><td>Discard changes to a file<small>Asks you to confirm first.</small></td><td><kbd>d</kbd></td></tr>
+          <tr><td>New branch (in the branches panel)</td><td><kbd>3</kbd> <span class="then">then</span> <kbd>n</kbd></td></tr>
+          <tr><td>Switch branch (in the branches panel)</td><td><kbd>3</kbd> <span class="then">then</span> <kbd>Space</kbd></td></tr>
+          <tr><td>Stash your changes</td><td><kbd>s</kbd></td></tr>
+          <tr><td>Show every key for the current panel</td><td><kbd>?</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="windows">
+        <h2>Windows and the terminal</h2>
+        <div class="keys"><table>
+          <tr><td>Floating terminal in the project folder<small>Press it again to hide; the terminal keeps running.</small></td><td><kbd>Ctrl</kbd><kbd>/</kbd></td></tr>
+          <tr><td>Split side by side / split top and bottom</td><td><kbd class="sp">Space</kbd><kbd>|</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>-</kbd></td></tr>
+          <tr><td>Move between splits (and the file tree)</td><td><kbd>Ctrl</kbd><kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd></td></tr>
+          <tr><td>Resize a split<small>Drag the border between splits with the mouse.</small></td><td><span class="then">mouse</span></td></tr>
+          <tr><td>Close this split</td><td><kbd class="sp">Space</kbd><kbd>w</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Toggle line numbers / light and dark</td><td><kbd class="sp">Space</kbd><kbd>u</kbd><kbd>l</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>u</kbd><kbd>b</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="test">
+        <h2>Tests and debugging</h2>
+        <div class="keys"><table>
+          <tr><td>Run the test under the cursor</td><td><kbd class="sp">Space</kbd><kbd>t</kbd><kbd>r</kbd></td></tr>
+          <tr><td>Run every test in this file</td><td><kbd class="sp">Space</kbd><kbd>t</kbd><kbd>t</kbd></td></tr>
+          <tr><td>Test results panel</td><td><kbd class="sp">Space</kbd><kbd>t</kbd><kbd>s</kbd></td></tr>
+          <tr><td>Debug the test under the cursor</td><td><kbd class="sp">Space</kbd><kbd>t</kbd><kbd>d</kbd></td></tr>
+          <tr><td>Set or remove a breakpoint</td><td><kbd class="sp">Space</kbd><kbd>d</kbd><kbd>b</kbd></td></tr>
+          <tr><td>Start or continue the debugger</td><td><kbd class="sp">Space</kbd><kbd>d</kbd><kbd>c</kbd></td></tr>
+          <tr><td>Step over / step into</td><td><kbd class="sp">Space</kbd><kbd>d</kbd><kbd>O</kbd> <span class="then">/</span> <kbd class="sp">Space</kbd><kbd>d</kbd><kbd>i</kbd></td></tr>
+          <tr><td>Show or hide the debugger panels</td><td><kbd class="sp">Space</kbd><kbd>d</kbd><kbd>u</kbd></td></tr>
+        </table></div>
+      </section>
+
+      <section id="claude">
+        <h2>Working alongside Claude</h2>
+        <p>Keep nvim and Claude Code side by side in tmux. When Claude edits a file you have open, nvim reloads it automatically once you switch back to it.</p>
+        <div class="keys"><table>
+          <tr><td>Split the tmux window side by side / top and bottom</td><td><kbd>Ctrl</kbd><kbd>b</kbd> <span class="then">then</span> <kbd>%</kbd> <span class="then">/</span> <kbd>"</kbd></td></tr>
+          <tr><td>Move between tmux panes<small>Clicking a pane works too.</small></td><td><kbd>Ctrl</kbd><kbd>b</kbd> <span class="then">then</span> <span class="then">arrow</span></td></tr>
+          <tr><td>Zoom one pane full screen and back</td><td><kbd>Ctrl</kbd><kbd>b</kbd> <span class="then">then</span> <kbd>z</kbd></td></tr>
+          <tr><td>See what Claude changed in a file</td><td><kbd>]</kbd><kbd>h</kbd> <span class="then">and</span> <kbd class="sp">Space</kbd><kbd>g</kbd><kbd>h</kbd><kbd>p</kbd></td></tr>
+          <tr><td>Review all of Claude's changes before committing</td><td><kbd class="sp">Space</kbd><kbd>g</kbd><kbd>g</kbd></td></tr>
+          <tr><td>Throw away your unsaved edits and reload from disk</td><td><code>:e!</code></td></tr>
+        </table></div>
+        <p class="note"><strong>Tip:</strong> save before asking Claude to edit a file you're working in. Otherwise nvim will ask which version to keep when you switch back.</p>
+      </section>
+
+      <section id="stuck">
+        <h2>When you're stuck</h2>
+        <div class="keys"><table>
+          <tr><td>Show the command menu</td><td><kbd class="sp">Space</kbd> <span class="then">and wait</span></td></tr>
+          <tr><td>Search every shortcut by name</td><td><kbd class="sp">Space</kbd><kbd>s</kbd><kbd>k</kbd></td></tr>
+          <tr><td>Something weird is on screen</td><td><kbd>Esc</kbd><kbd>Esc</kbd></td></tr>
+          <tr><td>Accidentally typed a command at the bottom</td><td><kbd>Esc</kbd></td></tr>
+          <tr><td>Turn language packs on or off</td><td><code>:LazyExtras</code></td></tr>
+          <tr><td>Update plugins</td><td><code>:Lazy</code> <span class="then">then</span> <kbd>U</kbd></td></tr>
+          <tr><td>See installed language tools</td><td><code>:Mason</code></td></tr>
+          <tr><td>Diagnose problems</td><td><code>:checkhealth</code></td></tr>
+          <tr><td>Learn vim basics in 20 minutes<small>Run in a terminal, not inside nvim.</small></td><td><code>vimtutor</code></td></tr>
+        </table></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById("q");
+  var none = document.getElementById("none");
+  var sections = Array.prototype.slice.call(document.querySelectorAll("main section"));
+  input.addEventListener("input", function () {
+    var q = input.value.trim().toLowerCase();
+    var anyShown = false;
+    sections.forEach(function (sec) {
+      var rows = sec.querySelectorAll("tr");
+      var shownRows = 0;
+      rows.forEach(function (tr) {
+        var hit = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;
+        tr.hidden = !hit;
+        if (hit) shownRows++;
+      });
+      var titleHit = q && sec.querySelector("h2").textContent.toLowerCase().indexOf(q) !== -1;
+      if (titleHit) { rows.forEach(function (tr) { tr.hidden = false; }); shownRows = rows.length; }
+      var show = !q || shownRows > 0;
+      sec.hidden = !show;
+      if (show) anyShown = true;
+      sec.querySelectorAll(".keys").forEach(function (k) {
+        k.hidden = q && k.querySelectorAll("tr:not([hidden])").length === 0;
+      });
+      sec.querySelectorAll("p, pre, ol, .modes, h3").forEach(function (el) { el.hidden = !!q && !titleHit; });
+    });
+    none.hidden = anyShown;
+  });
+})();
+</script>
+</body>
+</html>
